@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HomePage } from './components/HomePage';
 import { ProductCatalog } from './components/ProductCatalog';
 import { ProductDetail } from './components/ProductDetail';
@@ -30,19 +30,45 @@ export type CartItem = Product & {
 function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'catalog' | 'detail' | 'seller' | 'auth' | 'cart' | 'about' | 'contact'>('home');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userType, setUserType] = useState<'buyer' | 'seller'>('buyer');
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  
+  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('isLoggedIn') === 'true');
+  const [userType, setUserType] = useState<'buyer' | 'seller'>(() => (localStorage.getItem('userType') as 'buyer' | 'seller') || 'buyer');
+  const [userName, setUserName] = useState<string>(() => localStorage.getItem('userName') || '');
+  const [userEmail, setUserEmail] = useState<string>(() => localStorage.getItem('userEmail') || '');
+  const [userPhone, setUserPhone] = useState<string>(() => localStorage.getItem('userPhone') || '');
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('cartItems');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  useEffect(() => {
+    localStorage.setItem('isLoggedIn', String(isLoggedIn));
+    localStorage.setItem('userType', userType);
+    localStorage.setItem('userName', userName);
+    localStorage.setItem('userEmail', userEmail);
+    localStorage.setItem('userPhone', userPhone);
+  }, [isLoggedIn, userType, userName, userEmail, userPhone]);
+
+  useEffect(() => {
+    localStorage.setItem('cartItems', JSON.stringify(cartItems));
+  }, [cartItems]);
 
   const handleViewProduct = (product: Product) => {
     setSelectedProduct(product);
     setCurrentPage('detail');
   };
 
-  const handleLogin = (type: 'buyer' | 'seller') => {
+  const handleLogin = (type: 'buyer' | 'seller', name: string, email: string, phone: string) => {
     setIsLoggedIn(true);
     setUserType(type);
+    setUserName(name);
+    setUserEmail(email);
+    setUserPhone(phone);
     setCurrentPage('home');
   };
 
@@ -82,10 +108,16 @@ function App() {
       <Header
         isLoggedIn={isLoggedIn}
         userType={userType}
+        userName={userName}
+        userEmail={userEmail}
+        userPhone={userPhone}
         cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
         onNavigate={setCurrentPage}
         onLogout={() => {
           setIsLoggedIn(false);
+          setUserName('');
+          setUserEmail('');
+          setUserPhone('');
           setCurrentPage('home');
         }}
       />

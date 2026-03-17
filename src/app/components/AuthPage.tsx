@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { ArrowLeft, Mail, Lock, User, Phone } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, User, Phone, Package } from 'lucide-react';
 
 type AuthPageProps = {
-  onLogin: (userType: 'buyer' | 'seller') => void;
+  onLogin: (userType: 'buyer' | 'seller', name: string, email: string, phone: string) => void;
   onBack: () => void;
 };
 
 export function AuthPage({ onLogin, onBack }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [userType, setUserType] = useState<'buyer' | 'seller'>('buyer');
+  const [showGooglePicker, setShowGooglePicker] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -19,8 +20,69 @@ export function AuthPage({ onLogin, onBack }: AuthPageProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(userType);
+    
+    // Read registered users
+    let registeredUsers: any[] = [];
+    try {
+      const saved = localStorage.getItem('registeredUsers');
+      if (saved) registeredUsers = JSON.parse(saved);
+    } catch {}
+
+    if (!isLogin) {
+      if (formData.password !== formData.confirmPassword) {
+        alert("Passwords do not match!");
+        return;
+      }
+      // Check if user already exists
+      if (registeredUsers.find(u => u.email === formData.email)) {
+        alert("An account with this email already exists!");
+        return;
+      }
+      
+      const newUser = {
+        name: formData.name || formData.email.split('@')[0],
+        email: formData.email,
+        phone: formData.phone || '',
+        password: formData.password,
+        userType: userType
+      };
+      
+      registeredUsers.push(newUser);
+      localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+      
+      onLogin(userType, newUser.name, newUser.email, newUser.phone);
+    } else {
+      // Login matching
+      const user = registeredUsers.find(u => u.email === formData.email && u.password === formData.password);
+      if (user) {
+        // Log them in using stored info
+        onLogin(user.userType || userType, user.name, user.email, user.phone);
+      } else {
+        alert("Invalid email or password.");
+      }
+    }
   };
+
+  const handleSocialLogin = (provider: 'google' | 'facebook', account?: { name: string, email: string }) => {
+    if (provider === 'google' && !account) {
+      setShowGooglePicker(true);
+      return;
+    }
+    
+    if (provider === 'google' && account) {
+      onLogin(userType, account.name, account.email, '');
+    } else {
+      const name = 'Facebook User';
+      const email = 'facebook.user@example.com';
+      onLogin(userType, name, email, '');
+    }
+  };
+
+  const mockGoogleAccounts = [
+    { name: 'Alice Smith', email: 'alice.smith@gmail.com', avatar: 'A' },
+    { name: 'Bob Jones', email: 'bjones99@gmail.com', avatar: 'B' },
+    { name: 'GoldMart Dev', email: 'dev@goldmart.com', avatar: 'G' },
+  ];
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-gradient-to-br from-amber-50 to-yellow-100 py-12">
@@ -41,48 +103,82 @@ export function AuthPage({ onLogin, onBack }: AuthPageProps) {
             {isLogin ? 'Login to your account' : 'Join GoldMart today'}
           </p>
 
-          {/* User Type Selection */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <button
-              type="button"
-              onClick={() => setUserType('buyer')}
-              className={`py-3 px-4 rounded-lg font-semibold transition ${
-                userType === 'buyer'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Buyer
-            </button>
-            <button
-              type="button"
-              onClick={() => setUserType('seller')}
-              className={`py-3 px-4 rounded-lg font-semibold transition ${
-                userType === 'seller'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Seller
-            </button>
-          </div>
+          {/* User Type Selection (Only for Login) */}
+          {isLogin && (
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <button
+                type="button"
+                onClick={() => setUserType('buyer')}
+                className={`py-3 px-4 rounded-lg font-semibold transition ${
+                  userType === 'buyer'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Buyer
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserType('seller')}
+                className={`py-3 px-4 rounded-lg font-semibold transition ${
+                  userType === 'seller'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Seller
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
-              <div>
-                <label className="block text-sm font-semibold mb-2">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500"
-                    placeholder="Enter your full name"
-                    required={!isLogin}
-                  />
+              <>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Select Your Role</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setUserType('buyer')}
+                      className={`py-3 px-4 rounded-lg border-2 font-semibold transition flex justify-center items-center gap-2 ${
+                        userType === 'buyer'
+                          ? 'border-amber-600 bg-amber-50 text-amber-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <User className="w-5 h-5" />
+                      Buyer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserType('seller')}
+                      className={`py-3 px-4 rounded-lg border-2 font-semibold transition flex justify-center items-center gap-2 ${
+                        userType === 'seller'
+                          ? 'border-amber-600 bg-amber-50 text-amber-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Package className="w-5 h-5" />
+                      Seller
+                    </button>
+                  </div>
                 </div>
-              </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Full Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500"
+                      placeholder="Enter your full name"
+                      required={!isLogin}
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             <div>
@@ -184,7 +280,11 @@ export function AuthPage({ onLogin, onBack }: AuthPageProps) {
           <div className="mt-6 pt-6 border-t">
             <p className="text-center text-sm text-gray-500 mb-4">Or continue with</p>
             <div className="grid grid-cols-2 gap-4">
-              <button className="flex items-center justify-center gap-2 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+              <button
+                type="button"
+                onClick={() => handleSocialLogin('google')}
+                className="flex items-center justify-center gap-2 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
@@ -215,6 +315,41 @@ export function AuthPage({ onLogin, onBack }: AuthPageProps) {
           </div>
         </div>
       </div>
+
+      {/* Google Account Picker Modal */}
+      {showGooglePicker && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-xl font-bold mb-2">Choose an account</h3>
+            <p className="text-sm text-gray-500 mb-6">to continue to GoldMart</p>
+            
+            <div className="space-y-3">
+              {mockGoogleAccounts.map((account, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSocialLogin('google', account)}
+                  className="w-full flex items-center p-3 hover:bg-gray-50 border border-gray-100 rounded-lg transition text-left gap-4"
+                >
+                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
+                    {account.avatar}
+                  </div>
+                  <div className="overflow-hidden">
+                    <div className="font-semibold text-gray-900 truncate">{account.name}</div>
+                    <div className="text-sm text-gray-500 truncate">{account.email}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowGooglePicker(false)}
+              className="mt-6 w-full py-2 text-gray-600 hover:text-gray-900 font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

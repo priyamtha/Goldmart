@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Package, TrendingUp, DollarSign, Eye, Edit, Trash2 } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
@@ -7,8 +7,22 @@ type SellerDashboardProps = {
   onNavigateToAuth: () => void;
 };
 
+export type SellerProduct = {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  image: string;
+  views: number;
+  status: string;
+  location: string;
+};
+
 export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboardProps) {
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewProduct, setViewProduct] = useState<SellerProduct | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -16,33 +30,75 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
     weight: '',
     purity: '22K',
     description: '',
+    location: '',
+    image: null as File | null,
   });
 
-  const myProducts = [
-    {
-      id: '1',
-      name: 'Diamond Gold Necklace',
-      price: 24999,
-      category: 'Necklaces',
-      image: 'https://images.unsplash.com/photo-1611012756377-05e2e4269fa3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xkJTIwbmVja2xhY2UlMjBqZXdlbHJ5fGVufDF8fHx8MTc3MzAyNjY0MXww&ixlib=rb-4.1.0&q=80&w=1080',
-      views: 1240,
-      status: 'Active',
-    },
-    {
-      id: '2',
-      name: 'Designer Gold Bracelet',
-      price: 18999,
-      category: 'Bracelets',
-      image: 'https://images.unsplash.com/photo-1629587424599-ee8806a66127?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xkJTIwYnJhY2VsZXQlMjBsdXh1cnl8ZW58MXx8fHwxNzczMDAwODMyfDA&ixlib=rb-4.1.0&q=80&w=1080',
-      views: 856,
-      status: 'Active',
-    },
-  ];
+  const [products, setProducts] = useState<SellerProduct[]>(() => {
+    try {
+      const saved = localStorage.getItem('sellerProducts');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    
+    return [
+      {
+        id: '1',
+        name: 'Diamond Gold Necklace',
+        price: 24999,
+        category: 'Necklaces',
+        image: 'https://images.unsplash.com/photo-1611012756377-05e2e4269fa3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xkJTIwbmVja2xhY2UlMjBqZXdlbHJ5fGVufDF8fHx8MTc3MzAyNjY0MXww&ixlib=rb-4.1.0&q=80&w=1080',
+        views: 1240,
+        status: 'Active',
+        location: 'Mumbai, Maharashtra',
+      },
+      {
+        id: '2',
+        name: 'Designer Gold Bracelet',
+        price: 18999,
+        category: 'Bracelets',
+        image: 'https://images.unsplash.com/photo-1629587424599-ee8806a66127?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xkJTIwYnJhY2VsZXQlMjBsdXh1cnl8ZW58MXx8fHwxNzczMDAwODMyfDA&ixlib=rb-4.1.0&q=80&w=1080',
+        views: 856,
+        status: 'Active',
+        location: 'Delhi',
+      },
+    ];
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Handle form submission
+  useEffect(() => {
+    localStorage.setItem('sellerProducts', JSON.stringify(products));
+  }, [products]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData(prev => ({ ...prev, image: file }));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleEdit = (product: SellerProduct) => {
+    setFormData({
+      name: product.name,
+      price: product.price.toString(),
+      category: product.category,
+      weight: '',
+      purity: '22K',
+      description: '',
+      location: product.location || '',
+      image: null,
+    });
+    setImagePreview(product.image);
+    setEditingId(product.id);
+    setShowAddProduct(true);
+  };
+
+  const resetForm = () => {
     setShowAddProduct(false);
+    setEditingId(null);
     setFormData({
       name: '',
       price: '',
@@ -50,7 +106,41 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
       weight: '',
       purity: '22K',
       description: '',
+      location: '',
+      image: null,
     });
+    setImagePreview(null);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (editingId) {
+      setProducts(prev => prev.map(p => p.id === editingId ? {
+        ...p,
+        name: formData.name,
+        price: Number(formData.price),
+        category: formData.category,
+        location: formData.location,
+        image: imagePreview || p.image,
+      } : p));
+    } else {
+      // Create new product object
+      const newProduct = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: formData.name,
+        price: Number(formData.price),
+        category: formData.category,
+        location: formData.location,
+        image: imagePreview || 'https://images.unsplash.com/photo-1599643477874-5c92ed715d07?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxqZXdlbHJ5fGVufDF8fHx8MTc3MzAyNjY0MXww&ixlib=rb-4.1.0&q=80&w=1080', // Fallback placeholder if no image
+        views: 0,
+        status: 'Active',
+      };
+
+      setProducts(prev => [newProduct, ...prev]);
+    }
+    
+    resetForm();
   };
 
   if (!isLoggedIn) {
@@ -85,7 +175,7 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
             <span className="text-gray-600">Total Products</span>
             <Package className="w-5 h-5 text-amber-600" />
           </div>
-          <p className="text-3xl font-bold">12</p>
+          <p className="text-3xl font-bold">{products.length}</p>
           <p className="text-sm text-green-600 mt-1">+2 this month</p>
         </div>
 
@@ -133,7 +223,7 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
       {showAddProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold mb-6">Add New Product</h3>
+            <h3 className="text-2xl font-bold mb-6">{editingId ? 'Edit Product' : 'Add New Product'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold mb-2">Product Name</label>
@@ -203,6 +293,18 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
               </div>
 
               <div>
+                <label className="block text-sm font-semibold mb-2">Location</label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="e.g., Mumbai, Maharashtra"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-amber-500"
+                  required
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-semibold mb-2">Description</label>
                 <textarea
                   value={formData.description}
@@ -215,9 +317,28 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
 
               <div>
                 <label className="block text-sm font-semibold mb-2">Product Images</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-amber-500 transition">
-                  <p className="text-gray-600">Click to upload or drag and drop</p>
-                  <p className="text-sm text-gray-500 mt-1">PNG, JPG up to 5MB</p>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-amber-500 transition relative overflow-hidden group">
+                  <input 
+                    type="file" 
+                    accept="image/png, image/jpeg" 
+                    onChange={handleImageChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    title="Upload image"
+                  />
+                  {imagePreview ? (
+                    <div className="absolute inset-0 w-full h-full">
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                        <p className="text-white font-semibold">Click to change image</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-600">Click to upload or drag and drop</p>
+                      <p className="text-sm text-gray-500 mt-1">PNG, JPG up to 5MB</p>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -226,11 +347,11 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
                   type="submit"
                   className="flex-1 bg-amber-600 text-white py-3 rounded-lg font-semibold hover:bg-amber-700 transition"
                 >
-                  Add Product
+                  {editingId ? 'Save Changes' : 'Add Product'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddProduct(false)}
+                  onClick={resetForm}
                   className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
                 >
                   Cancel
@@ -249,13 +370,13 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
               <th className="text-left px-6 py-4 font-semibold">Product</th>
               <th className="text-left px-6 py-4 font-semibold">Category</th>
               <th className="text-left px-6 py-4 font-semibold">Price</th>
-              <th className="text-left px-6 py-4 font-semibold">Views</th>
+              <th className="text-left px-6 py-4 font-semibold">Location</th>
               <th className="text-left px-6 py-4 font-semibold">Status</th>
               <th className="text-left px-6 py-4 font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {myProducts.map((product) => (
+            {products.map((product) => (
               <tr key={product.id} className="border-b hover:bg-gray-50 transition">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -269,7 +390,7 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
                 </td>
                 <td className="px-6 py-4">{product.category}</td>
                 <td className="px-6 py-4 font-semibold">₹{product.price.toLocaleString()}</td>
-                <td className="px-6 py-4">{product.views.toLocaleString()}</td>
+                <td className="px-6 py-4">{product.location}</td>
                 <td className="px-6 py-4">
                   <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
                     {product.status}
@@ -277,13 +398,29 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
-                    <button className="p-2 hover:bg-gray-100 rounded-lg transition" title="View">
+                    <button 
+                      onClick={() => setViewProduct(product)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition" 
+                      title="View"
+                    >
                       <Eye className="w-4 h-4 text-gray-600" />
                     </button>
-                    <button className="p-2 hover:bg-gray-100 rounded-lg transition" title="Edit">
+                    <button 
+                      onClick={() => handleEdit(product)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition" 
+                      title="Edit"
+                    >
                       <Edit className="w-4 h-4 text-blue-600" />
                     </button>
-                    <button className="p-2 hover:bg-gray-100 rounded-lg transition" title="Delete">
+                    <button 
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to delete this product?')) {
+                          setProducts(prev => prev.filter(p => p.id !== product.id));
+                        }
+                      }}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition" 
+                      title="Delete"
+                    >
                       <Trash2 className="w-4 h-4 text-red-600" />
                     </button>
                   </div>
@@ -293,6 +430,38 @@ export function SellerDashboard({ isLoggedIn, onNavigateToAuth }: SellerDashboar
           </tbody>
         </table>
       </div>
+
+      {/* View Product Modal */}
+      {viewProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold">{viewProduct.name}</h3>
+              <button onClick={() => setViewProduct(null)} className="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+            </div>
+            <img src={viewProduct.image} alt={viewProduct.name} className="w-full h-48 object-cover rounded-lg mb-4" />
+            <div className="space-y-2">
+              <p><span className="font-semibold">Category:</span> {viewProduct.category}</p>
+              <p><span className="font-semibold">Price:</span> ₹{viewProduct.price.toLocaleString()}</p>
+              <p><span className="font-semibold">Location:</span> {viewProduct.location}</p>
+              <p><span className="font-semibold">Views:</span> {viewProduct.views.toLocaleString()}</p>
+              <p className="flex items-center gap-2"><span className="font-semibold">Status:</span> 
+                <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                  {viewProduct.status}
+                </span>
+              </p>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setViewProduct(null)} 
+                className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

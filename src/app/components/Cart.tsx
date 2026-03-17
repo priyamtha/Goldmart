@@ -1,4 +1,5 @@
-import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag, CheckCircle2, QrCode } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import type { CartItem } from '../App';
 
@@ -11,6 +12,7 @@ type CartProps = {
 };
 
 export function Cart({ items, onUpdateQuantity, onBack, isLoggedIn, onNavigateToAuth }: CartProps) {
+  const [showReceipt, setShowReceipt] = useState(false);
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal > 20000 ? 0 : 500;
   const tax = subtotal * 0.03; // 3% GST
@@ -148,7 +150,10 @@ export function Cart({ items, onUpdateQuantity, onBack, isLoggedIn, onNavigateTo
 
             {isLoggedIn ? (
               <>
-                <button className="w-full bg-amber-600 text-white py-4 rounded-lg font-semibold hover:bg-amber-700 transition mb-3">
+                <button 
+                  onClick={() => setShowReceipt(true)}
+                  className="w-full bg-amber-600 text-white py-4 rounded-lg font-semibold hover:bg-amber-700 transition mb-3"
+                >
                   Proceed to Checkout
                 </button>
                 <button
@@ -196,6 +201,59 @@ export function Cart({ items, onUpdateQuantity, onBack, isLoggedIn, onNavigateTo
           </div>
         </div>
       </div>
+
+      {/* Checkout Selection / Receipt Modal */}
+      {showReceipt && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-8 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+            <div className="text-center mb-6">
+              <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h2 className="text-3xl font-bold text-gray-900">Order Confirmed!</h2>
+              <p className="text-gray-600 mt-2">Thank you for your purchase.</p>
+            </div>
+
+            <div className="border-t border-b py-4 mb-6">
+              <h3 className="font-bold text-lg mb-4">Payment Receipt</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center text-sm font-medium">
+                  <span className="text-gray-500">Order ID:</span>
+                  <span>#GM-{Math.floor(Math.random() * 1000000)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm font-medium">
+                  <span className="text-gray-500">Amount Paid:</span>
+                  <span className="text-amber-600 text-xl font-bold">₹{total.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-6 text-center mb-6 relative overflow-hidden">
+              <h3 className="font-semibold text-blue-900 mb-2">Scan QR to Pay via UPI</h3>
+              <p className="text-sm text-blue-700 mb-4">You have selected online payment. Scan below using GPay, PhonePe, or Paytm.</p>
+              <div className="bg-white inline-block p-4 rounded-xl shadow-sm border border-blue-100 mb-2 mt-2">
+                <QrCode className="w-40 h-40 text-blue-900" />
+              </div>
+              <p className="text-xs text-blue-500 mt-2">QR Code is uniquely generated for this transaction</p>
+            </div>
+
+            <div className="text-center bg-gray-50 rounded-lg p-4 mb-6">
+              <p className="text-sm text-gray-600 mb-1">Need help with your order?</p>
+              <p className="font-bold text-gray-900 flex items-center justify-center gap-2">
+                <span className="text-amber-600">Call Us:</span> 8072534445
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowReceipt(false);
+                onBack(); 
+              }}
+              className="w-full bg-amber-600 text-white py-3 rounded-lg font-semibold hover:bg-amber-700 transition"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
